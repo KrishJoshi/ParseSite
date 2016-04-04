@@ -1,0 +1,1140 @@
+'use strict';
+/**
+ * @ngdoc overview
+ * @name tutrApp
+ * @description
+ * # tutrApp
+ *
+ * Main module of the application.
+ */
+angular.module('tutrApp', [
+  'ngAnimate',
+  'ngCookies',
+  'ngResource',
+  'ngRoute',
+  'ngSanitize',
+  'ngTouch',
+  'parse-angular',
+  'parse-angular.enhance',
+  'FacebookPatch'  /* our facebook angular wrapper so we can use FB.apiAngular instead of FB.api */,
+  'ui.bootstrap',
+  'angular-cache',
+  'ui-rangeSlider',
+  'ngProgress',
+  'angular-growl',
+  'decipher.tags'
+]).config(function ($routeProvider, CacheFactoryProvider, growlProvider) {
+  $routeProvider.when('/', {
+    templateUrl: 'views/main.html',
+    controller: 'MainCtrl',
+    controllerAs: 'main'
+  }).when('/about', {
+    templateUrl: 'views/about.html',
+    controller: 'AboutCtrl',
+    controllerAs: 'about'
+  }).when('/tutors/', {
+    templateUrl: 'views/tutors.html',
+    controller: 'TutorsCtrl',
+    controllerAs: 'tutors'
+  }).when('/tutors/:subject', {
+    templateUrl: 'views/tutors.html',
+    controller: 'TutorsCtrl',
+    controllerAs: 'tutors'
+  }).when('/tutors/:tutorId', {
+    templateUrl: 'views/tutor.html',
+    controller: 'TutorCtrl',
+    controllerAs: 'tutor'
+  }).when('/login', {
+    templateUrl: 'views/login.html',
+    controller: 'LoginCtrl',
+    controllerAs: 'login'
+  }).when('/register', {
+    templateUrl: 'views/register.html',
+    controller: 'RegisterCtrl',
+    controllerAs: 'register'
+  }).when('/messages', {
+    templateUrl: 'views/messages.html',
+    controller: 'MessagesCtrl',
+    controllerAs: 'messages'
+  }).when('/messages/:dialogId', {
+    templateUrl: 'views/dialog.html',
+    controller: 'DialogCtrl',
+    controllerAs: 'dialog'
+  }).when('/profile', {
+    templateUrl: 'views/profile.html',
+    controller: 'ProfileCtrl',
+    controllerAs: 'profile'
+  }).otherwise({ redirectTo: '/' });
+  angular.extend(CacheFactoryProvider.defaults, { maxAge: 24 * 60 * 60 * 1000 });
+  growlProvider.globalTimeToLive({
+    success: 3000,
+    error: 3000,
+    warning: 3000,
+    info: 4000
+  });
+  growlProvider.globalDisableCountDown(true);
+}).run(function ($rootScope, messageService) {
+  // Parse Setup
+  Parse.initialize('moFYNNMeQQJGz74zgDsbaaLtQfNM4hPgMLdYz54M', '0I3OWlWDuZV5udNdosU6xWNBnbJamgyOPApQDK77');
+  $rootScope.currentUser = Parse.User.current();
+  // FACEBOOK init
+  window.fbPromise.then(function () {
+    Parse.FacebookUtils.init({
+      // pro-tip: swap App ID out for PROD App ID automatically on deploy using grunt-replace
+      appId: 849475151774251,
+      // Facebook App ID
+      cookie: true,
+      // enable cookies to allow Parse to access the session
+      xfbml: true,
+      // parse XFBML
+      frictionlessRequests: true  // recommended
+    });
+  });
+  $rootScope.userType = {
+    Student: 'Student',
+    Tutor: 'Tutor'
+  };
+  messageService.createQblox();
+  if ($rootScope.currentUser) {
+    messageService.loginToChat($rootScope.currentUser).then(function () {
+      $rootScope.$broadcast('userSet', true);
+    });
+  }
+  // Global log out function
+  $rootScope.logOut = function () {
+    Parse.User.logOut();
+    $rootScope.currentUser = null;
+    messageService.logoutFromChat();
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:AboutCtrl
+ * @description
+ * # AboutCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('AboutCtrl', function () {
+  this.awesomeThings = [
+    'HTML5 Boilerplate',
+    'AngularJS',
+    'Karma'
+  ];
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:DialogCtrl
+ * @description
+ * # DialogCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('DialogCtrl', function ($scope, messageService, $routeParams) {
+  $scope.$on('userSet', function () {
+    $scope.dialog = messageService.getDialog($routeParams.dialogId);
+    messageService.retrieveChatMessages($routeParams.dialogId).then(function () {
+      $scope.dialogId = $routeParams.dialogId;
+      $scope.messages = messageService.messages;
+    });
+  });
+  $scope.sendMessage = function () {
+    messageService.sendMessageToUser($scope.dialog, 'Hello World');
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:LoginCtrl
+ * @description
+ * # LoginCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('LoginCtrl', function ($scope, $rootScope, messageService, UserService, $window) {
+  var loginHandler = {
+    success: function (user) {
+      $rootScope.currentUser = user;
+      $rootScope.$apply();
+      messageService.loginToChat(user);
+      userService.getRoleByUser(user).then(function (role) {
+        $rootScope.currentUserType = role.attributes.name;
+      });
+      $window.location.href = '/#/profile';
+    },
+    error: function (user, error) {
+      $scope.errorMessage = 'Unable to log in: ' + error.message;
+    }
+  };
+  $scope.performLogin = function (form) {
+    $scope.successMessage = null;
+    $scope.errorMessage = null;
+    Parse.User.logIn(form.email, form.password, loginHandler);
+  };
+  $scope.fbLogin = function () {
+    $scope.successMessage = null;
+    $scope.errorMessage = null;
+    Parse.FacebookUtils.logIn(null, loginHandler);
+  };
+  $scope.resetPassword = function (form) {
+    $scope.successMessage = null;
+    $scope.errorMessage = null;
+    Parse.User.requestPasswordReset(form.email, {
+      success: function () {
+        $scope.successMessage = 'A password reset link has been sent to your email address';
+      },
+      error: function (error) {
+        $scope.errorMessage = 'Could not reset password: ' + error.message;
+      }
+    });
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:MainCtrl
+ * @description
+ * # MainCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('MainCtrl', function ($scope, $rootScope, subjectService) {
+  subjectService.getAllSubjects().then(function (result) {
+    $scope.subjects = result;
+  });
+  $scope.isStudent = function () {
+    $rootScope.currentUserType = $rootScope.userType.Student;
+  };
+  $scope.isTutor = function () {
+    $rootScope.currentUserType = $rootScope.userType.Tutor;
+  };
+});
+'use strict';
+/**
+* @ngdoc function
+* @name tutrApp.controller:MessagesCtrl
+* @description
+* # MessagesCtrl
+* Controller of the tutrApp
+*/
+angular.module('tutrApp').controller('MessagesCtrl', function ($scope, messageService) {
+  $scope.messageDialogs = messageService.dialogs;
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:ProfileCtrl
+ * @description
+ * # ProfileCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('ProfileCtrl', function ($scope, $rootScope, UserService, subjectService, growl) {
+  var currentUser = $rootScope.currentUser;
+  var userBackup = angular.copy($rootScope.currentUser);
+  var typeBackup;
+  $scope.subjects = [];
+  subjectService.getAllSubjects().then(function (result) {
+    for (var i = 0; i < result.length; i++) {
+      var subject = result[i];
+      $scope.subjects.push(subject.attributes.name);
+    }
+  });
+  var userType;
+  UserService.getRoleByUser(currentUser).then(function (userTypeForServer) {
+    console.log(userTypeForServer);
+    typeBackup = userTypeForServer.attributes.name;
+    $scope.currentUserType = userTypeForServer.attributes.name;
+  });
+  if ($rootScope.currentUser.availability) {
+    var userTime = currentUser.attributes.availability.split(' - ');
+    $scope.startTime = userTime[0];
+    $scope.endTime = userTime[1];
+  }
+  function generateUUID() {
+    var d = new Date().getTime();
+    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (d + Math.random() * 16) % 16 | 0;
+      d = Math.floor(d / 16);
+      return (c === 'x' ? r : r & 3 | 8).toString(16);
+    });
+    return uuid;
+  }
+  $scope.save = function () {
+    currentUser = $rootScope.currentUser;
+    // Image
+    if ($scope.newImage) {
+      var fileType = $scope.newImage.file.type.split('/')[1];
+      var file = new Parse.File(generateUUID() + '.' + fileType, { base64: $scope.newImage.dataURL });
+      file.save().then(function (image) {
+        $rootScope.currentUser.attributes.picture = image.url();
+        Parse.User.current().set($rootScope.currentUser).save();
+      });
+    }
+    // Location
+    if ($rootScope.currentUser.attributes.postCode !== userBackup.attributes.postCode) {
+      var locationApi = 'http://maps.googleapis.com/maps/api/geocode/json?address={{postCode}},+UK&sensor=false';
+      $.get(locationApi.replace('{{postCode}}', $rootScope.currentUser.attributes.postCode), function (returnData) {
+        if (returnData.status === 'OK') {
+          var loc = returnData.results[0].geometry.location;
+          $rootScope.currentUser.attributes.location = new Parse.GeoPoint({
+            latitude: loc.lat,
+            longitude: loc.lng
+          });
+          Parse.User.current().set($rootScope.currentUser).save();
+        }
+      });
+    }
+    // User availability
+    $rootScope.currentUser.attributes.availability = $scope.startTime + ' - ' + $scope.endTime;
+    // User Type
+    if (typeBackup !== $scope.userType) {
+      UserService.changeUserRole($rootScope.currentUser, $scope.userType);
+    }
+    // Lets save
+    Parse.User.current().set($rootScope.currentUser).save(null, {
+      success: function (returnData) {
+        console.log(returnData);
+        growl.success('User changes saved successfully!');
+      },
+      error: function (error) {
+        console.log(error);
+        growl.error(error);
+      }
+    });
+  };
+  $scope.cancel = function () {
+    $rootScope.currentUser = userBackup;
+    $scope.newImage = null;
+    if ($rootScope.currentUser.availability) {
+      var userTime = currentUser.attributes.availability.split(' - ');
+      $scope.startTime = userTime[0];
+      $scope.endTime = userTime[1];
+    } else {
+      $scope.startTime = '';
+      $scope.endTime = '';
+    }
+    growl.info('User changes were discarded');
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:RegisterCtrl
+ * @description
+ * # RegisterCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('RegisterCtrl', function ($scope, $rootScope, UserService) {
+  //$scope.selectedUserType = "Student";
+  $scope.performRegister = function (form) {
+    $scope.successMessage = null;
+    $scope.errorMessage = null;
+    if (!$rootScope.currentUserType) {
+      if (!$scope.selectedUserType) {
+        $scope.errorMessage = 'Please select if you\'re a Student or Tutor';
+        form.userType.$error.required = true;
+      } else {
+        $rootScope.currentUserType = $scope.selectedUserType;
+      }
+    }
+    var promise = UserService.register(form);
+    promise.then(function () {
+      $scope.successMessage = 'Thank you ' + form.firstName + ', you have been successfully registered';
+    }, function (error) {
+      $scope.errorMessage = 'Unable to register: ' + error.message;
+    });
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:TutorCtrl
+ * @description
+ * # TutorCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('TutorCtrl', function ($scope, $routeParams, tutorService, messageService) {
+  tutorService.getTutorByPointer($routeParams.tutorId).then(function (tutor) {
+    $scope.tutor = tutor;
+  });
+  $scope.connect = function () {
+    messageService.createNewDialog($scope.tutor);
+  };
+});
+'use strict';
+/**
+ * @ngdoc function
+ * @name tutrApp.controller:TutorsCtrl
+ * @description
+ * # TutorsCtrl
+ * Controller of the tutrApp
+ */
+angular.module('tutrApp').controller('TutorsCtrl', function ($scope, tutorService, subjectService, $routeParams) {
+  // set available range
+  $scope.minPrice = 1;
+  $scope.maxPrice = 24;
+  $scope.refineOptions = {};
+  $scope.refineOptions.time = {
+    min: 1,
+    max: 24
+  };
+  $scope.showLoginNudge = false;
+  var options = $scope.refineOptions;
+  $scope.tutorClicked = function () {
+    $scope.showLoginNudge = true;
+  };
+  var subjectFilter = function (tutor) {
+    if (options.subject) {
+      var subjectFound = false;
+      var subjects = tutor.attributes.subjects;
+      if (subjects) {
+        for (var j = 0; j < subjects.length; j++) {
+          var subject = subjects[j];
+          if (subject.attributes.name === options.subject) {
+            subjectFound = true;
+            break;
+          }
+        }
+      }
+      return subjectFound;
+    } else {
+      return true;
+    }
+  };
+  var distanceFilter = function (tutor) {
+    if (options.distance) {
+      var isLocationCloseBy = false;
+      var userLocation = new Parse.GeoPoint({
+        latitude: 0,
+        longitude: 0
+      });
+      navigator.geolocation.getCurrentPosition(function (position) {
+        userLocation = new Parse.GeoPoint({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+      });
+      if (tutor.attributes.location) {
+        if (userLocation.milesTo(tutor.attributes.location) <= options.distance) {
+          isLocationCloseBy = true;
+        }
+      }
+      return isLocationCloseBy;
+    } else {
+      return true;
+    }
+  };
+  var timeFilter = function (tutor) {
+    if (options.time.min !== 0 && options.time.max !== 24) {
+      var withinTime = false;
+      if (tutor.attributes.availability) {
+        var timing = tutor.attributes.availability.split('-');
+        timing.min = parseInt(timing[0]);
+        timing.max = parseInt(timing[1]);
+        if (timing.min >= options.time.min && timing.max <= options.time.max) {
+          withinTime = true;
+        }
+      }
+      return withinTime;
+    } else {
+      return true;
+    }
+  };
+  var rateFilter = function (tutor) {
+    if (options.rate) {
+      var isRateLower = false;
+      if (tutor.attributes.hourlyRate <= options.rate) {
+        isRateLower = true;
+      }
+      return isRateLower;
+    } else {
+      return true;
+    }
+  };
+  var filter = function (tutor) {
+    var passesAllTests = false;
+    if (subjectFilter(tutor) && distanceFilter(tutor) && timeFilter(tutor) && rateFilter(tutor)) {
+      passesAllTests = true;
+    }
+    return passesAllTests;
+  };
+  $scope.refine = function () {
+    var newTutors = [];
+    tutorService.getAllTutors().then(function (tutors) {
+      for (var i = 0; i < tutors.length; i++) {
+        var tutor = tutors[i];
+        if (filter(tutor)) {
+          newTutors.push(tutor);
+        }
+      }
+      $scope.tutors = newTutors;
+    });
+  };
+  subjectService.getAllSubjects().then(function (result) {
+    $scope.subjects = result;
+  });
+  if ($routeParams.subject) {
+    $scope.refineOptions.subject = $routeParams.subject;
+    $scope.refine();
+  } else {
+    tutorService.getAllTutors().then(function (tutors) {
+      $scope.tutors = tutors;
+    });
+  }
+});
+'use strict';
+/**
+ * @ngdoc directive
+ * @name tutrApp.directive:image
+ * @description
+ * # image
+ */
+angular.module('tutrApp').directive('image', function ($q) {
+  'use strict';
+  var URL = window.URL || window.webkitURL;
+  var getResizeArea = function () {
+    var resizeAreaId = 'fileupload-resize-area';
+    var resizeArea = document.getElementById(resizeAreaId);
+    if (!resizeArea) {
+      resizeArea = document.createElement('canvas');
+      resizeArea.id = resizeAreaId;
+      resizeArea.style.visibility = 'hidden';
+      document.body.appendChild(resizeArea);
+    }
+    return resizeArea;
+  };
+  var resizeImage = function (origImage, options) {
+    var maxHeight = options.resizeMaxHeight || 300;
+    var maxWidth = options.resizeMaxWidth || 250;
+    var quality = options.resizeQuality || 0.7;
+    var type = options.resizeType || 'image/jpg';
+    var canvas = getResizeArea();
+    var height = origImage.height;
+    var width = origImage.width;
+    // calculate the width and height, constraining the proportions
+    if (width > height) {
+      if (width > maxWidth) {
+        height = Math.round(height *= maxWidth / width);
+        width = maxWidth;
+      }
+    } else {
+      if (height > maxHeight) {
+        width = Math.round(width *= maxHeight / height);
+        height = maxHeight;
+      }
+    }
+    canvas.width = width;
+    canvas.height = height;
+    //draw image on canvas
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(origImage, 0, 0, width, height);
+    // get the data from canvas as 70% jpg (or specified type).
+    return canvas.toDataURL(type, quality);
+  };
+  var createImage = function (url, callback) {
+    var image = new Image();
+    image.onload = function () {
+      callback(image);
+    };
+    image.src = url;
+  };
+  var fileToDataURL = function (file) {
+    var deferred = $q.defer();
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      deferred.resolve(e.target.result);
+    };
+    reader.readAsDataURL(file);
+    return deferred.promise;
+  };
+  return {
+    restrict: 'A',
+    scope: {
+      image: '=',
+      resizeMaxHeight: '@?',
+      resizeMaxWidth: '@?',
+      resizeQuality: '@?',
+      resizeType: '@?'
+    },
+    link: function postLink(scope, element, attrs, ctrl) {
+      var doResizing = function (imageResult, callback) {
+        createImage(imageResult.url, function (image) {
+          var dataURL = resizeImage(image, scope);
+          imageResult.resized = {
+            dataURL: dataURL,
+            type: dataURL.match(/:(.+\/.+);/)[1]
+          };
+          callback(imageResult);
+        });
+      };
+      var applyScope = function (imageResult) {
+        scope.$apply(function () {
+          //console.log(imageResult);
+          if (attrs.multiple) {
+            scope.image.push(imageResult);
+          } else {
+            scope.image = imageResult;
+          }
+        });
+      };
+      element.bind('change', function (evt) {
+        //when multiple always return an array of images
+        if (attrs.multiple) {
+          scope.image = [];
+        }
+        var files = evt.target.files;
+        for (var i = 0; i < files.length; i++) {
+          //create a result object for each file in files
+          var imageResult = {
+            file: files[i],
+            url: URL.createObjectURL(files[i])
+          };
+          fileToDataURL(files[i]).then(function (dataURL) {
+            imageResult.dataURL = dataURL;
+          });
+          if (scope.resizeMaxHeight || scope.resizeMaxWidth) {
+            //resize image
+            doResizing(imageResult, function (imageResult) {
+              applyScope(imageResult);
+            });
+          } else {
+            //no resizing
+            applyScope(imageResult);
+          }
+        }
+      });
+    }
+  };
+});
+'use strict';
+/**
+ * @ngdoc filter
+ * @name tutrApp.filter:qbloxUser
+ * @function
+ * @description
+ * # qbloxUser
+ * Filter in the tutrApp.
+ */
+angular.module('tutrApp').filter('qbloxUserById', function (messageService) {
+  return function (input) {
+    var users = messageService.listOfUsers;
+    for (var i = 0; i < users.length; i++) {
+      var user = users[i];
+      if (user.id === input) {
+        return user.full_name;
+      }
+    }
+  };
+});
+'use strict';
+angular.module('FacebookPatch', []).factory('FacebookAngularPatch', function ($q, $timeout) {
+  var fbApiAngular = function () {
+    var params = [].splice.call(arguments, 0);
+    var defer = $q.defer();
+    var angularWrap = $timeout;
+    window.fbPromise.then(function () {
+      // Pushing callback function that will resolve to the params array
+      params.push(function (response) {
+        if (!_.isUndefined(response.error)) {
+          angularWrap(function () {
+            defer.reject(response.error);
+          });
+          return;
+        }
+        angularWrap(function () {
+          defer.resolve(response);
+        });
+      });
+      FB.api.apply(FB, params);
+    });
+    return defer.promise;
+  };
+  // using the fbPromise we set up in index.html, we extend the FB SDK with FB.apiAngular
+  // now we use FB.apiAngular instead of FB.api, which gives us an angular wrapped promise
+  window.fbPromise.then(function () {
+    FB.apiAngular = fbApiAngular;
+  });
+});
+'use strict';
+angular.module('ParseServices', []).factory('ParseSDK', function () {
+});
+'use strict';
+/**
+ * @ngdoc service
+ * @name tutrApp.messageService
+ * @description
+ * # messageService
+ * Factory in the tutrApp.
+ */
+angular.module('tutrApp').factory('messageService', function ($q) {
+  var listOfUsers = [];
+  var dialogs = {};
+  var currentLoggedInUserId = [];
+  var messages = [];
+  var contacts = [];
+  var createQblox = function () {
+    var config = {
+      chatProtocol: { active: 2 },
+      debug: false
+    };
+    QB.init(26337, 'MkgE4ke6EsCGSsu', '5emhh3z5nwytLDR', config);
+  };
+  var getUsers = function () {
+    QB.users.listUsers({}, function (err, users) {
+      if (users) {
+        for (var i = 0; i < users.items.length; i++) {
+          var user = users.items[i].user;
+          listOfUsers.push(user);
+        }
+      } else {
+      }
+    });
+  };
+  var userLoggedInCallback = function (user, parseUser, deferred) {
+    currentLoggedInUserId = user.user_id;
+    getUsers();
+    QB.chat.connect({
+      userId: currentLoggedInUserId,
+      password: parseUser.id
+    }, function (err, roster) {
+      if (!err) {
+        contacts = roster;
+      }
+    });
+    QB.chat.onMessageListener = onMessage;
+    getDialogslist().then(function () {
+      deferred.resolve(user);
+    });
+  };
+  var signUpUser = function (parseUser, deferred) {
+    QB.createSession(function (err, result) {
+      if (result) {
+        var params = {
+          email: parseUser.attributes.username,
+          password: parseUser.id,
+          full_name: parseUser.attributes.firstName
+        };
+        QB.users.create(params, function (err, result) {
+          if (result) {
+            QB.login(params, function (err, result) {
+              userLoggedInCallback(result, parseUser, deferred);
+            });
+          }
+        });
+      }
+    });
+  };
+  var loginToChat = function (parseUser) {
+    var deferred = $q.defer();
+    QB.createSession({
+      email: parseUser.attributes.username,
+      password: parseUser.id
+    }, function (err, res) {
+      if (res) {
+        userLoggedInCallback(res, parseUser, deferred);
+      } else {
+        signUpUser(parseUser, deferred);
+      }
+    });
+    return deferred.promise;
+  };
+  var logoutFromChat = function () {
+    QB.chat.disconnect();
+  };
+  var findBloxUser = function (email) {
+    for (var i = 0; i < listOfUsers.length; i++) {
+      var user = listOfUsers[i];
+      if (user.email.toLowerCase === email.toLowerCase) {
+        return user;
+      }
+    }
+  };
+  var retrieveChatMessages = function (dialogId) {
+    var deferred = $q.defer();
+    // Load messages history
+    //
+    var params = {
+      chat_dialog_id: dialogId,
+      sort_desc: 'date_sent',
+      limit: 100,
+      skip: 0
+    };
+    QB.chat.message.list(params, function (err, msgs) {
+      messages[dialogId] = msgs;
+      deferred.resolve(messages[dialogId]);
+    });
+    return deferred.promise;
+  };
+  var getDialog = function (dialogId) {
+    for (var i = 0; i < dialogs.items.length; i++) {
+      var dialog = dialogs.items[i];
+      if (dialog._id === dialogId) {
+        return dialog;
+      }
+    }
+  };
+  var getDialogslist = function () {
+    var deferred = $q.defer();
+    var filters = null;
+    QB.chat.dialog.list(filters, function (err, resDialogs) {
+      if (err) {
+      } else {
+        angular.copy(resDialogs, dialogs);
+        deferred.resolve(dialogs);
+      }
+    });
+    return deferred.promise;
+  };
+  var createNewDialog = function (withUser) {
+    var user = findBloxUser(withUser.attributes.username);
+    var params = {
+      type: 3,
+      occupants_ids: user.id
+    };
+    QB.chat.dialog.create(params, function (err, createdDialog) {
+      if (err) {
+        console.log(err);
+      } else {
+        getDialogslist();  //console.log(createdDialog);
+      }
+    });
+  };
+  var sendMessageToUser = function (dialog, message) {
+    var msg = {
+      type: 'chat',
+      body: message,
+      extension: { save_to_history: 1 },
+      senderId: currentLoggedInUserId
+    };
+    var opponentId = QB.chat.helpers.getRecipientId(dialog.occupants_ids, currentLoggedInUserId);
+    QB.chat.send(opponentId, msg);
+  };
+  function onMessage(userId, msg) {
+    //console.log(msg);
+    var message = {
+      sender_id: userId,
+      message: msg.body
+    };
+    var dialog_id = msg.dialog_id;
+    if (messages[dialog_id]) {
+      messages[dialog_id].items.push(message);
+    } else {
+      messages[dialog_id] = { items: [] };
+      messages[dialog_id].items.push(message);
+    }
+  }
+  // Public API here
+  return {
+    createQblox: createQblox,
+    loginToChat: loginToChat,
+    logoutFromChat: logoutFromChat,
+    createNewDialog: createNewDialog,
+    getDialogslist: getDialogslist,
+    getDialog: getDialog,
+    dialogs: dialogs,
+    sendMessageToUser: sendMessageToUser,
+    listOfUsers: listOfUsers,
+    retrieveChatMessages: retrieveChatMessages,
+    messages: messages
+  };
+});
+'use strict';
+/**
+ * @ngdoc service
+ * @name tutrApp.subjectService
+ * @description
+ * # subjectService
+ * Factory in the tutrApp.
+ */
+angular.module('tutrApp').factory('subjectService', function ($q, CacheFactory) {
+  // Service logic
+  var subjectCacheId = 'subjectCache';
+  if (!CacheFactory.get(subjectCacheId)) {
+    // or CacheFactory('bookCache', { ... });
+    CacheFactory.createCache(subjectCacheId, { deleteOnExpire: 'aggressive' });
+  }
+  var subjectCache = CacheFactory.get(subjectCacheId);
+  var getAllSubjects = function () {
+    var deferred = $q.defer();
+    if (subjectCache.info().size === 0) {
+      var query = new Parse.Query('Subjects');
+      query.include('_Users');
+      query.find().then(function (subjectsFromServer) {
+        subjectCache.put(subjectCacheId, subjectsFromServer);
+        deferred.resolve(subjectsFromServer);
+      });
+    } else {
+      deferred.resolve(subjectCache.get(subjectCacheId));
+    }
+    return deferred.promise;
+  };
+  var getSubject = function (subjectName) {
+    var deferred = $q.defer();
+    getAllSubjects().then(function (allSubjects) {
+      for (var i = 0; i < allSubjects.length; i++) {
+        var subject = allSubjects[i];
+        if (subject.attributes.name === subjectName) {
+          deferred.resolve(subject);
+          break;
+        }
+      }
+      deferred.reject(false);
+    });
+    return deferred.promise;
+  };
+  var addNewSubject = function (subjectName) {
+    var deferred = $q.defer();
+    var newSubject = new Parse.Object('Subjects');
+    newSubject.attributes.name = subjectName;
+    newSubject.save().then(function (subject) {
+      deferred.resolve(subject);
+    });
+    return deferred.promise;
+  };
+  //func addNewSubject (subject: String) -> PFObject {
+  //  let subjectObj = PFObject(className: "Subjects")
+  //  subjectObj["name"] = subject
+  //  subjectObj.saveInBackground()
+  //  return subjectObj
+  //}
+  var timesFunctionCalled = 0;
+  var addSubjectCallback = function (promise, arrayLength) {
+    timesFunctionCalled++;
+    if (timesFunctionCalled === arrayLength - 1) {
+      timesFunctionCalled = 0;
+      promise.resolve();
+    }
+  };
+  var addSubjects = function (user, subjectList) {
+    var deferred = $q.defer();
+    for (var i = 0; i < subjectList.length; i++) {
+      var subjectName = subjectList[i];
+      getSubject(subjectName).then(function (subject) {
+        user.attributes.subjects.push(subject);
+        addSubjectCallback(deferred, subjectList.length);
+      }, function () {
+        addNewSubject(subjectName).then(function (subject) {
+          user.attributes.subjects.push(subject);
+          addSubjectCallback(deferred, subjectList.length);
+        });
+      });
+    }
+    return deferred.promise;
+  };
+  //    func addSubjects (subjects: [String]) {
+  //      let query = PFQuery(className: "Subjects")
+  //      query.whereKey("name", containedIn: subjects)
+  //
+  //      query.findObjectsInBackgroundWithBlock({ (response, error) -> Void in
+  //      if error == nil {
+  //        if let subjectObj = response {
+  //          let subjectObj = subjectObj as? [PFObject]
+  //          //print (subjectObj)
+  //
+  //          for parseSubject:PFObject in subjectObj! {
+  //            for subject in subjects {
+  //            if(subject == parseSubject["name"] as! String) {
+  //              PFUser.currentUser()!.addObject(parseSubject, forKey: "subjects")
+  //              break;
+  //            }
+  //          }
+  //          var newSubject = self.addNewSubject(parseSubject["name"] as! String)
+  //          PFUser.currentUser()!.addObject(parseSubject, forKey: "subjects")
+  //        }
+  //        PFUser.currentUser()?.saveInBackground()
+  //      }
+  //
+  //  })
+  //}
+  // Public API here
+  return {
+    getAllSubjects: getAllSubjects,
+    addSubjects: addSubjects
+  };
+});
+'use strict';
+/**
+ * @ngdoc service
+ * @name tutrApp.tutorService
+ * @description
+ * # tutorService
+ * Factory in the tutrApp.
+ */
+angular.module('tutrApp').factory('tutorService', function ($q, CacheFactory, UserService) {
+  // Service logic
+  var tutorCacheId = 'tutorCache';
+  if (!CacheFactory.get(tutorCacheId)) {
+    // or CacheFactory('bookCache', { ... });
+    CacheFactory.createCache(tutorCacheId, {
+      maxAge: 60 * 60 * 1000,
+      // 1 hour
+      deleteOnExpire: 'aggressive'
+    });
+  }
+  var tutorCache = CacheFactory.get(tutorCacheId);
+  var tutorsNearMe = [];
+  var getAllTutors = function () {
+    var deferred = $q.defer();
+    if (tutorCache.info().size === 0) {
+      UserService.getUsersByRole('Tutor').then(function (tutorsFromServer) {
+        tutorCache.put(tutorCacheId, tutorsFromServer);
+        deferred.resolve(tutorsFromServer);
+      });  //var query = new Parse.Query(Parse.User);
+           //query.include("subjects");
+           //query.find().then(function (tutorsFromServer) {
+           //  tutorCache.put(tutorCacheId, tutorsFromServer);
+           //
+           //  deferred.resolve(tutorsFromServer);
+           //});
+    } else {
+      deferred.resolve(tutorCache.get(tutorCacheId));
+    }
+    return deferred.promise;
+  };
+  var getTutorsNearBy = function (currentLocaton) {
+    var deferred = $q.defer();
+    if (tutorsNearMe.length === 0) {
+      var query = new Parse.Query(Parse.User);
+      query.include('subjects');
+      query.near('location', currentLocaton);
+      query.find().then(function (tutors) {
+        tutorsNearMe = tutors;
+        deferred.resolve(tutors);
+        return tutors;
+      });
+    } else {
+      deferred.resolve(tutorsNearMe);
+    }
+    return deferred.promise;
+  };
+  var getTutorById = function (tutorId) {
+    var tutors = tutorCache.get(tutorCacheId);
+    for (var i = 0; i < tutors.length; i++) {
+      var tutor = tutors[i];
+      if (tutor.id === tutorId) {
+        return tutor;
+      }
+    }
+  };
+  var getTutorByPointer = function (pointer) {
+    var deferred = $q.defer();
+    var tutors = tutorCache.get(tutorCacheId);
+    if (tutors) {
+      deferred.resolve(tutors[pointer]);
+    } else {
+      getAllTutors().then(function () {
+        deferred.resolve(tutors[pointer]);
+      });
+    }
+    return deferred.promise;
+  };
+  // Public API here
+  return {
+    getAllTutors: getAllTutors,
+    getTutorsNearBy: getTutorsNearBy,
+    getTutorById: getTutorById,
+    getTutorByPointer: getTutorByPointer
+  };
+});
+'use strict';
+/**
+ * @ngdoc service
+ * @name tutrApp.UserService
+ * @description
+ * # UserService
+ * Factory in the tutrApp.
+ */
+angular.module('tutrApp').factory('UserService', function ($rootScope, messageService, $q) {
+  var register = function (form) {
+    var deferred = $q.defer();
+    var user = new Parse.User();
+    user.setEmail(form.email);
+    user.setUsername(form.email);
+    user.setPassword(form.password);
+    user.set('firstName', form.firstName);
+    user.set('lastName', form.lastName);
+    user.signUp(null, {
+      success: function (user) {
+        messageService.loginToChat(user);
+        $rootScope.currentUser = user;
+        $rootScope.$apply();
+        addRoleToUser(user, $rootScope.currentUserType);
+        deferred.resolve(user);
+      },
+      error: function (user, error) {
+        deferred.reject(error);
+      }
+    });
+    return deferred.promise;
+  };
+  var signIn = function (form) {
+    var deferred = $q.defer();
+    Parse.User.logIn(form.email, form.password, loginHandler);
+    return deferred.promise;
+  };
+  var addRoleToUser = function (user, newRole) {
+    var deferred = $q.defer();
+    $rootScope.currentUserType = newRole;
+    var query = new Parse.Query(Parse.Role);
+    query.equalTo('name', $rootScope.currentUserType);
+    query.first({
+      success: function (role) {
+        console.log(role);
+        role.getUsers().add(user);
+        role.save();
+        deferred.resolve(true);
+      },
+      error: function (returnObj, error) {
+        deferred.reject(false);
+        console.log(error);
+      }
+    });
+    return deferred.promise;
+  };
+  var changeUserRole = function (user, newRole) {
+    var query = new Parse.Query(Parse.Role);
+    query.find().then(function (returnData) {
+      for (var i = 0; i < returnData.length; i++) {
+        var role = returnData[i];
+        role.getUsers().remove(user);
+        role.save();
+      }
+      addRoleToUser(user, newRole);
+    });
+  };
+  var getRoleByUser = function (user) {
+    var deferred = $q.defer();
+    var query = new Parse.Query(Parse.Role);
+    query.equalTo('users', user);
+    query.first().then(function (role) {
+      deferred.resolve(role);
+    }, function (error) {
+      deferred.reject(error);
+    });
+    return deferred.promise;
+  };
+  var getUsersByRole = function (role) {
+    var deferred = $q.defer();
+    var query = new Parse.Query(Parse.Role);
+    query.equalTo('name', role);
+    query.first().then(function (role) {
+      var query = role.relation('users').query();
+      query.include('subjects');
+      query.find().then(function (users) {
+        deferred.resolve(users);
+      }, function (error) {
+        deferred.reject(error);
+      });
+    }, function (error) {
+      deferred.reject(error);
+    });
+    return deferred.promise;
+  };
+  // Public API here
+  return {
+    register: register,
+    getUsersByRole: getUsersByRole,
+    addRoleToUser: addRoleToUser,
+    changeUserRole: changeUserRole,
+    getRoleByUser: getRoleByUser,
+    signIn: signIn
+  };
+});
