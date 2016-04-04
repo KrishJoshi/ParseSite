@@ -46,7 +46,7 @@ httpServer.listen(port, function() {
 ParseServer.createLiveQueryServer(httpServer);
 
 var site = express();
-site.use('/static', express.static(__dirname + '/public'));
+site.use('/', express.static(__dirname + '/public/'));
 
 var server = site.listen(80, function () {
     console.log('Node server is running..');
