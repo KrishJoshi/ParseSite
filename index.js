@@ -45,3 +45,9 @@ httpServer.listen(port, function() {
 // This will enable the Live Query real-time server
 ParseServer.createLiveQueryServer(httpServer);
 
+var site = express();
+site.use('/static', express.static(__dirname + '/public'));
+
+var server = site.listen(80, function () {
+    console.log('Node server is running..');
+});
