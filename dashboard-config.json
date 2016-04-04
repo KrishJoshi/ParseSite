@@ -1,0 +1,16 @@
+{
+  "apps": [
+    {
+      "serverURL": "http://ec2-user@ec2-52-31-116-57.eu-west-1.compute.amazonaws.com:1337/parse",
+      "appId": "moFYNNMeQQJGz74zgDsbaaLtQfNM4hPgMLdYz54M",
+      "masterKey": "7hZdVUDtjSuFOUipj3BkTBcCfTiQ0AGYZak4Fd6D",
+      "appName": "Tutr"
+    }
+  ],
+  "users": [
+    {
+      "user":"krish",
+      "pass":"1q2w3e"
+    }
+  ]
+}
