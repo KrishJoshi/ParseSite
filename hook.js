@@ -5,7 +5,7 @@ gith({
   repo: 'KrishJoshi/ParseSite'  // the github-user/repo-name
 }).on('all', function(payload){
     console.log("push received");
-    exec('./hook.sh ' + payload.branch, function(err, stdout, stderr){
+    exec('ls', function(err, stdout, stderr){
     	      console.log("git deployed to branch " + payload.branch);
 
       if (err) {
