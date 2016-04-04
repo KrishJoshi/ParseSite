@@ -6,15 +6,15 @@ gith({
 }).on('all', function(payload){
     console.log("push received");
     exec('./hook.sh ' + payload.branch, function(err, stdout, stderr){
-    	      console.log("git deployed to branch " + payload.branch);
+    console.log("git deployed to branch " + payload.branch);
 
-      if (err) {
-      	console.log(err);
-      	return err;
-      }
+	if (err) {
+		console.log(err);
+		return err;
+	}
 
-      console.log(stderr);
-      console.log(stdout);
-      console.log("git deployed to branch " + payload.branch);
+	console.log(stderr);
+	console.log(stdout);
+	console.log("git deployed to branch " + payload.branch);
     });
 });
