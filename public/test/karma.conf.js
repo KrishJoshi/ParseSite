@@ -41,11 +41,8 @@ module.exports = function(config) {
       'bower_components/bootstrap-css/js/bootstrap.min.js',
       'bower_components/angular-tags/dist/angular-tags-0.2.10.js',
       'bower_components/angular-touch/angular-touch.js',
-      'bower_components/bootswatch-dist/js/bootstrap.js',
       'bower_components/ng-tags-input/ng-tags-input.min.js',
-      'bower_components/ngprogress/build/ngProgress.js',
-      'bower_components/parse/parse.min.js',
-      'bower_components/parse-angular-patch/dist/parse-angular.js',
+      'bower_components/ngprogress/build/ngprogress.min.js',
       'bower_components/quickblox/quickblox.js',
       'bower_components/angular-mocks/angular-mocks.js',
       // endbower

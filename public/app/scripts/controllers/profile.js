@@ -142,7 +142,7 @@ angular.module('tutrApp')
       savePromises.push(addNewImage());
 
       // Location
-      savePromises.push(locationAddition());
+      savePromises.push($scope.addLocation());
 
       // User Type
       savePromises.push(changeUserType());

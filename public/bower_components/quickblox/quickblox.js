@@ -1,4 +1,4 @@
-/* QuickBlox JavaScript SDK - v1.13.0 - 2015-09-02 */
+/* QuickBlox JavaScript SDK - v1.13.1 - 2015-09-18 */
 
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.QB = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 /*
@@ -44,7 +44,7 @@ AuthProxy.prototype = {
     // Signature of message with SHA-1 using secret key
     message = generateAuthMsg(params);
     message.signature = signMessage(message, config.creds.authSecret);
-
+    
     if (config.debug) { console.log('AuthProxy.createSession', message); }
     this.service.ajax({url: Utils.getUrl(config.urls.session), type: 'POST', data: message},
                       function(err, res) {
@@ -84,7 +84,7 @@ AuthProxy.prototype = {
     if (config.debug) { console.log('AuthProxy.logout'); }
     this.service.ajax({url: Utils.getUrl(config.urls.login), type: 'DELETE', dataType:'text'}, callback);
   }
-
+  
 };
 
 module.exports = AuthProxy;
@@ -98,7 +98,7 @@ function generateAuthMsg(params) {
     nonce: Utils.randomNonce(),
     timestamp: Utils.unixTime()
   };
-
+  
   // With user authorization
   if (params.login && params.password) {
     message.user = {login: params.login, password: params.password};
@@ -117,7 +117,7 @@ function generateAuthMsg(params) {
       messages.keys.secret = params.keys.secret;
     }
   }
-
+  
   return message;
 }
 
@@ -131,7 +131,7 @@ function signMessage(message, secret) {
       return val + '=' + message[val];
     }
   }).sort().join('&');
-
+  
   return CryptoJS(sessionMsg, secret).toString();
 }
 
@@ -740,9 +740,10 @@ RosterProxy.prototype = {
     });
   },
 
-  add: function(jid, callback) {
-    var self = this,
-        userId = self.helpers.getIdFromNode(jid).toString();
+  add: function(jidOrUserId, callback) {
+    var self = this;
+    var userJid = this.helpers.jidOrUserId(jidOrUserId);
+    var userId = this.helpers.getIdFromNode(userJid).toString();
 
     roster[userId] = {
       subscription: 'none',
@@ -750,16 +751,17 @@ RosterProxy.prototype = {
     };
 
     self._sendSubscriptionPresence({
-      jid: jid,
+      jid: userJid,
       type: 'subscribe'
     });
 
     if (typeof callback === 'function') callback();
   },
 
-  confirm: function(jid, callback) {
-    var self = this,
-        userId = self.helpers.getIdFromNode(jid).toString();
+  confirm: function(jidOrUserId, callback) {
+    var self = this;
+    var userJid = this.helpers.jidOrUserId(jidOrUserId);
+    var userId = this.helpers.getIdFromNode(userJid).toString();
 
     roster[userId] = {
       subscription: 'from',
@@ -767,21 +769,22 @@ RosterProxy.prototype = {
     };
 
     self._sendSubscriptionPresence({
-      jid: jid,
+      jid: userJid,
       type: 'subscribed'
     });
 
     self._sendSubscriptionPresence({
-      jid: jid,
+      jid: userJid,
       type: 'subscribe'
     });
 
     if (typeof callback === 'function') callback();
   },
 
-  reject: function(jid, callback) {
-    var self = this,
-        userId = self.helpers.getIdFromNode(jid).toString();
+  reject: function(jidOrUserId, callback) {
+    var self = this;
+    var userJid = this.helpers.jidOrUserId(jidOrUserId);
+    var userId = this.helpers.getIdFromNode(userJid).toString();
 
     roster[userId] = {
       subscription: 'none',
@@ -789,15 +792,18 @@ RosterProxy.prototype = {
     };
 
     self._sendSubscriptionPresence({
-      jid: jid,
+      jid: userJid,
       type: 'unsubscribed'
     });
 
     if (typeof callback === 'function') callback();
   },
 
-  remove: function(jid, callback) {
-    var iq, userId, self = this;
+  remove: function(jidOrUserId, callback) {
+    var self = this;
+    var userJid = this.helpers.jidOrUserId(jidOrUserId);
+    var userId = this.helpers.getIdFromNode(userJid).toString();
+    var iq;
 
     iq = $iq({
       from: connection.jid,
@@ -806,11 +812,9 @@ RosterProxy.prototype = {
     }).c('query', {
       xmlns: Strophe.NS.ROSTER
     }).c('item', {
-      jid: jid,
+      jid: userJid,
       subscription: 'remove'
     });
-
-    userId = self.helpers.getIdFromNode(jid).toString();
 
     connection.sendIQ(iq, function() {
       delete roster[userId];
@@ -1069,9 +1073,9 @@ module.exports = ChatProxy;
 /* Private
 ---------------------------------------------------------------------- */
 function trace(text) {
-   if (config.debug) {
+  // if (config.debug) {
     console.log('[QBChat]:', text);
-   }
+  // }
 }
 
 function getError(code, detail) {
@@ -1113,7 +1117,7 @@ function ContentProxy(service) {
 }
 
 ContentProxy.prototype = {
-
+  
   create: function(params, callback){
    if (config.debug) { console.log('ContentProxy.create', params);}
     this.service.ajax({url: Utils.getUrl(config.urls.blobs), data: {blob:params}, type: 'POST'}, function(err,result){
@@ -1156,12 +1160,12 @@ ContentProxy.prototype = {
       else {
         var uri = parseUri(createResult.blob_object_access.params), uploadParams = { url: (config.ssl ? 'https://' : 'http://') + uri.host }, data = new FormData();
         fileId = createResult.id;
-
+        
         Object.keys(uri.queryKey).forEach(function(val) {
           data.append(val, decodeURIComponent(uri.queryKey[val]));
         });
         data.append('file', file, createResult.name);
-
+        
         uploadParams.data = data;
         _this.upload(uploadParams, function(err, result) {
           if (err) { callback(err, null); }
@@ -1189,7 +1193,7 @@ ContentProxy.prototype = {
         var result = {}, rootElement = xmlDoc.documentElement, children = rootElement.childNodes, i, m;
         for (i = 0, m = children.length; i < m ; i++){
           result[children[i].nodeName] = children[i].childNodes[0].nodeValue;
-        }
+        } 
         if (config.debug) { console.log('result', result); }
         callback (null, result);
       }
@@ -1237,7 +1241,7 @@ ContentProxy.prototype = {
     if (typeof params.name !== 'undefined') { data.blob.name = params.name; }
     this.service.ajax({url: Utils.getUrl(config.urls.blobs, params.id), data: data}, function(err, res) {
       if (err) { callback (err, null); }
-      else { callback (null, res); }
+      else { callback (null, res); } 
     });
   }
 
@@ -1375,7 +1379,7 @@ DataProxy.prototype = {
                         else { callback (err, true); }
                       });
   }
-
+  
 };
 
 module.exports = DataProxy;
@@ -1420,7 +1424,7 @@ GeoProxy.prototype = {
       if (params.hasOwnProperty(prop)) {
         if (allowedProps.indexOf(prop)>0) {
           msg[prop] = params[prop];
-        }
+        } 
       }
     }
     if (config.debug) { console.log('GeoProxy.create', params);}
@@ -1528,7 +1532,7 @@ function TokensProxy(service){
 }
 
 TokensProxy.prototype = {
-
+  
   create: function(params, callback){
     var message = {
       push_token: {
@@ -1547,7 +1551,7 @@ TokensProxy.prototype = {
 
   delete: function(id, callback) {
     if (config.debug) { console.log('MessageProxy.deletePushToken', id); }
-    this.service.ajax({url: Utils.getUrl(config.urls.pushtokens, id), type: 'DELETE', dataType:'text'},
+    this.service.ajax({url: Utils.getUrl(config.urls.pushtokens, id), type: 'DELETE', dataType:'text'}, 
                       function (err, res) {
                         if (err) {callback(err, null);}
                         else {callback(null, true);}
@@ -1576,7 +1580,7 @@ SubscriptionsProxy.prototype = {
 
   delete: function(id, callback) {
     if (config.debug) { console.log('MessageProxy.deleteSubscription', id); }
-    this.service.ajax({url: Utils.getUrl(config.urls.subscriptions, id), type: 'DELETE', dataType:'text'},
+    this.service.ajax({url: Utils.getUrl(config.urls.subscriptions, id), type: 'DELETE', dataType:'text'}, 
                       function(err, res){
                         if (err) { callback(err, null);}
                         else { callback(null, true);}
@@ -1607,7 +1611,7 @@ EventsProxy.prototype = {
     if (config.debug) { console.log('MessageProxy.getEvent', id); }
     this.service.ajax({url: Utils.getUrl(config.urls.events, id)}, callback);
   },
-
+  
   status: function(id, callback) {
     if (config.debug) { console.log('MessageProxy.getEventStatus', id); }
     this.service.ajax({url: Utils.getUrl(config.urls.events, id + '/status')}, callback);
@@ -1652,12 +1656,12 @@ UsersProxy.prototype = {
 
   listUsers: function(params, callback) {
     var message = {}, filters = [], item;
-
+    
     if (typeof params === 'function' && typeof callback === 'undefined') {
       callback = params;
       params = {};
     }
-
+    
     if (params.filter) {
       if (params.filter instanceof Array) {
         params.filter.forEach(function(el) {
@@ -1679,14 +1683,14 @@ UsersProxy.prototype = {
     if (params.per_page) {
       message.per_page = params.per_page;
     }
-
+    
     if (config.debug) { console.log('UsersProxy.listUsers', message); }
     this.service.ajax({url: Utils.getUrl(config.urls.users), data: message}, callback);
   },
 
   get: function(params, callback) {
     var url;
-
+    
     if (typeof params === 'number') {
       url = params;
       params = {};
@@ -1708,7 +1712,7 @@ UsersProxy.prototype = {
         params = {};
       }
     }
-
+    
     if (config.debug) { console.log('UsersProxy.get', params); }
     this.service.ajax({url: Utils.getUrl(config.urls.users, url), data: params},
                       function(err, res) {
@@ -1737,7 +1741,7 @@ UsersProxy.prototype = {
 
   delete: function(params, callback) {
     var url;
-
+    
     if (typeof params === 'number') {
       url = params;
     } else {
@@ -1745,7 +1749,7 @@ UsersProxy.prototype = {
         url = 'external/' + params.external;
       }
     }
-
+    
     if (config.debug) { console.log('UsersProxy.delete', url); }
     this.service.ajax({url: Utils.getUrl(config.urls.users, url), type: 'DELETE', dataType: 'text'}, callback);
   },
@@ -1763,14 +1767,14 @@ module.exports = UsersProxy;
 ---------------------------------------------------------------------- */
 function generateFilter(obj) {
   var type = obj.field in DATE_FIELDS ? 'date' : typeof obj.value;
-
+  
   if (obj.value instanceof Array) {
     if (type == 'object') {
       type = typeof obj.value[0];
     }
     obj.value = obj.value.toString();
   }
-
+  
   return [type, obj.field, obj.param, obj.value].join(' ');
 }
 
@@ -1858,7 +1862,7 @@ function WebRTCProxy(service, conn) {
         extension = self._getExtension(extraParams);
 
     var sessionId = extension.sessionID;
-
+    
     if (delay || extension.moduleIdentifier !== WEBRTC_MODULE_ID) return true;
 
     // clean for users
@@ -1867,7 +1871,7 @@ function WebRTCProxy(service, conn) {
     switch (extension.signalType) {
     case signalingType.CALL:
       trace('onCall from ' + userId);
-
+      
       if (callers[userId]) {
       	trace('skip onCallListener, a user already got it');
       	return true;
@@ -1887,7 +1891,7 @@ function WebRTCProxy(service, conn) {
 
       extension.callType = extension.callType === '1' ? 'video' : 'audio';
       delete extension.sdp;
-
+      
       if (typeof self.onCallListener === 'function'){
         self.onCallListener(userId, extension);
       }
@@ -1895,7 +1899,7 @@ function WebRTCProxy(service, conn) {
       break;
     case signalingType.ACCEPT:
       trace('onAccept from ' + userId);
-
+        
       clearDialingTimerInterval(userId);
       clearCallTimer(userId);
 
@@ -1922,7 +1926,7 @@ function WebRTCProxy(service, conn) {
       clearCallTimer(userId);
 
       clearCallers(userId);
-
+      
       self._close();
       if (typeof self.onStopCallListener === 'function')
         self.onStopCallListener(userId, extension);
@@ -1940,7 +1944,7 @@ function WebRTCProxy(service, conn) {
         self.onUpdateCallListener(userId, extension);
       break;
     }
-
+    
     // we must return true to keep the handler alive
     // returning false would remove it after it finishes
     return true;
@@ -1953,7 +1957,7 @@ function WebRTCProxy(service, conn) {
     if (extraParams) {
       for (var i = 0, len = extraParams.childNodes.length; i < len; i++) {
         if (extraParams.childNodes[i].tagName === 'iceCandidates') {
-
+        
           // iceCandidates
           items = extraParams.childNodes[i].childNodes;
           for (var j = 0, len2 = items.length; j < len2; j++) {
@@ -1998,7 +2002,7 @@ function WebRTCProxy(service, conn) {
   this._answerTimeoutCallback = function (userId){
   	clearCallers(userId);
     self._close();
-
+    
     if(typeof self.onSessionStateChangedListener === 'function'){
       self.onSessionStateChangedListener(self.SessionState.CLOSED, userId);
     }
@@ -2087,7 +2091,7 @@ WebRTCProxy.prototype.snapshot = function(id) {
       canvas = document.createElement('canvas'),
       context = canvas.getContext('2d'),
       dataURL, blob;
-
+  
   if (video) {
     canvas.width = video.clientWidth;
     canvas.height = video.clientHeight;
@@ -2154,7 +2158,7 @@ WebRTCProxy.prototype._createPeer = function(params) {
   };
   peer = new RTCPeerConnection(pcConfig);
   peer.init(this, params);
-
+  
   trace("Peer._createPeer: " + peer + ", sessionID: " + peer.sessionID);
 };
 
@@ -2200,7 +2204,7 @@ WebRTCProxy.prototype.accept = function(userId, extension) {
   trace('Accept. userId: ' + userId + ', extension: ' + JSON.stringify(extension));
 
   clearAnswerTimer(userId);
-
+  
   var caller = callers[userId];
   if (caller) {
     this._createPeer({
@@ -2292,7 +2296,7 @@ WebRTCProxy.prototype._sendMessage = function(userId, extension, type, callType,
     extension.callType = callType === 'video' ? '1' : '2';
   }
 
-  if (type === 'CALL' || type === 'ACCEPT') {
+  if (type === 'CALL' || type === 'ACCEPT') {    
     extension.sdp = peer.localDescription.sdp;
     extension.platform = 'web';
   }
@@ -2301,18 +2305,18 @@ WebRTCProxy.prototype._sendMessage = function(userId, extension, type, callType,
     extension.callerID = this.helpers.getIdFromNode(connection.jid);
     extension.opponentsIDs = opponentsIDs;
   }
-
+  
   params = {
     from: connection.jid,
     to: this.helpers.getUserJid(userId, this.service.getSession().application_id),
     type: 'headline',
     id: Utils.getBsonObjectId()
   };
-
+  
   msg = $msg(params).c('extraParams', {
     xmlns: Strophe.NS.CLIENT
   });
-
+  
   Object.keys(extension).forEach(function(field) {
     if (field === 'iceCandidates') {
 
@@ -2344,7 +2348,7 @@ WebRTCProxy.prototype._sendMessage = function(userId, extension, type, callType,
       msg.c(field).t(extension[field]).up();
     }
   });
-
+  
   connection.send(msg);
 };
 
@@ -2383,12 +2387,12 @@ RTCPeerConnection.prototype.init = function(service, options) {
   this.service = service;
   this.sessionID = options && options.sessionID || Date.now();
   this.type = options && options.description ? 'answer' : 'offer';
-
+  
   this.addStream(this.service.localStream);
   this.onicecandidate = this.onIceCandidateCallback;
   this.onaddstream = this.onRemoteStreamCallback;
   this.onsignalingstatechange = this.onSignalingStateCallback;
-  this.oniceconnectionstatechange = this.onIceConnectionStateCallback;
+  this.oniceconnectionstatechange = this.onIceConnectionStateCallback;  
 
   if (this.type === 'answer') {
     this.onRemoteSessionCallback(options.description, 'offer');
@@ -2463,7 +2467,7 @@ RTCPeerConnection.prototype.onSignalingStateCallback = function() {
 
 RTCPeerConnection.prototype.onIceConnectionStateCallback = function() {
   trace("onIceConnectionStateCallback: " + peer.iceConnectionState);
-
+  
   var newIceConnectionState = peer.iceConnectionState;
 
   // read more about all states:
@@ -2475,7 +2479,7 @@ RTCPeerConnection.prototype.onIceConnectionStateCallback = function() {
   // notify user about state changes
   //
   if(typeof peer.service.onSessionStateChangedListener === 'function'){
-	var sessionState = null;
+	var sessionState = null;	
 	if (newIceConnectionState === 'checking'){
       sessionState = peer.service.SessionState.CONNECTING;
 	} else if (newIceConnectionState === 'connected'){
@@ -2593,11 +2597,11 @@ function startCallTimer(userId, callback){
 function dataURItoBlob(dataURI, contentType) {
   var arr = [],
       binary = window.atob(dataURI.split(',')[1]);
-
+  
   for (var i = 0, len = binary.length; i < len; i++) {
     arr.push(binary.charCodeAt(i));
   }
-
+  
   return new Blob([new Uint8Array(arr)], {type: contentType});
 }
 
@@ -2615,7 +2619,7 @@ Blob.prototype.download = function() {
  */
 
 var config = {
-  version: '1.13.0',
+  version: '1.13.1',
   creds: {
     appId: '',
     authKey: '',
@@ -2740,7 +2744,7 @@ QuickBlox.prototype = {
       var WebRTC = require('./modules/qbWebRTC');
       this.webrtc = new WebRTC(this.service, conn || null);
     }
-
+    
     this.auth = new Auth(this.service);
     this.users = new Users(this.service);
     this.chat = new Chat(this.service, this.webrtc || null, conn || null);
@@ -2748,7 +2752,7 @@ QuickBlox.prototype = {
     this.location = new Location(this.service);
     this.messages = new Messages(this.service);
     this.data = new Data(this.service);
-
+    
     // Initialization by outside token
     if (typeof appId === 'string' && !authKey && !authSecret) {
       this.service.setSession({ token: appId });
@@ -2779,7 +2783,7 @@ QuickBlox.prototype = {
   logout: function(callback) {
     this.auth.logout(callback);
   }
-
+  
 };
 
 var QB = new QuickBlox();
@@ -2825,7 +2829,7 @@ ServiceProxy.prototype = {
   getSession: function() {
     return this.qbInst.session;
   },
-
+  
   handleResponse: function(error, response, next, retry) {
     // can add middleware here...
     var _this = this;
@@ -2878,16 +2882,16 @@ ServiceProxy.prototype = {
         else callback(errorMsg, null);
       }
     };
-
+  
     if(!isBrowser) {
-
+      
       var isJSONRequest = ajaxCall.dataType === 'json',
-        makingQBRequest = params.url.indexOf('://' + config.endpoints.s3Bucket) === -1 &&
-                          _this.qbInst &&
-                          _this.qbInst.session &&
+        makingQBRequest = params.url.indexOf('://' + config.endpoints.s3Bucket) === -1 && 
+                          _this.qbInst && 
+                          _this.qbInst.session && 
                           _this.qbInst.session.token ||
                           false;
-
+                          
       var qbRequest = {
         url: ajaxCall.url,
         method: ajaxCall.type,
@@ -2896,7 +2900,7 @@ ServiceProxy.prototype = {
         form: !isJSONRequest ? ajaxCall.data : null,
         headers: makingQBRequest ? { 'QB-Token' : _this.qbInst.session.token, 'QB-SDK': 'JS ' + versionNum + ' - Server' } : null
       };
-
+          
       var requestCallback = function(error, response, body) {
         if(error || response.statusCode !== 200 && response.statusCode !== 201 && response.statusCode !== 202) {
           var errorMsg;
@@ -2919,19 +2923,19 @@ ServiceProxy.prototype = {
       };
 
     }
-
+    
     // Optional - for example 'multipart/form-data' when sending a file.
     // Default is 'application/x-www-form-urlencoded; charset=UTF-8'
     if (typeof params.contentType === 'boolean' || typeof params.contentType === 'string') { ajaxCall.contentType = params.contentType; }
     if (typeof params.processData === 'boolean') { ajaxCall.processData = params.processData; }
-
+    
     if(isBrowser) {
       ajax( ajaxCall );
     } else {
       request(qbRequest, requestCallback);
     }
   }
-
+  
 };
 
 module.exports = ServiceProxy;
@@ -2950,7 +2954,7 @@ var config = require('./qbConfig');
 function Connection() {
   var protocol = config.chatProtocol.active === 1 ? config.chatProtocol.bosh : config.chatProtocol.websocket;
   var conn = new Strophe.Connection(protocol);
-   if (config.debug) {
+  // if (config.debug) {
     if (config.chatProtocol.active === 1) {
       conn.xmlInput = function(data) { if (data.childNodes[0]) {for (var i = 0, len = data.childNodes.length; i < len; i++) { console.log('[QBChat RECV]:', data.childNodes[i]); }} };
       conn.xmlOutput = function(data) { if (data.childNodes[0]) {for (var i = 0, len = data.childNodes.length; i < len; i++) { console.log('[QBChat SENT]:', data.childNodes[i]); }} };
@@ -2958,7 +2962,7 @@ function Connection() {
       conn.xmlInput = function(data) { console.log('[QBChat RECV]:', data); };
       conn.xmlOutput = function(data) { console.log('[QBChat SENT]:', data); };
     }
-   }
+  // }
 
   return conn;
 }

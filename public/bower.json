@@ -24,8 +24,6 @@
     "font-awesome": "~4.4.0",
     "ng-tags-input": "3.0.0",
     "ngprogress": "~1.1.2",
-    "parse": "~1.5.0",
-    "parse-angular-patch": "~0.1.2",
     "quickblox": "~1.13.0"
   },
   "devDependencies": {
@@ -40,6 +38,9 @@
         "dist/css/bootstrap.css",
         "dist/js/bootstrap.js"
       ]
+    },
+    "bootswatch-dist": {
+      "main": ["css/bootstrap.min.css"]
     }
   }
 }

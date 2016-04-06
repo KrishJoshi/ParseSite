@@ -1,0 +1,26 @@
+{
+  "bitwise": true,
+  "curly": true,
+  "eqeqeq": true,
+  "eqnull": true,
+  "esnext": true,
+  "globalstrict": true,
+  "latedef": true,
+  "mocha" : true,
+  "noarg": true,
+  "node": true,
+  "strict": true,
+  "undef": true,
+  "globals": { // Globals variables.
+    "jasmine": true,
+    "angular": true,
+    "browser": true,
+    "element": true,
+    "by":true,
+    "io":true,
+    "_":false,
+    "$":false,
+    "Parse": true,
+    "window": true
+  }
+}

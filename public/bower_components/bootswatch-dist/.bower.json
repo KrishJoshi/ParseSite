@@ -6,13 +6,7 @@
   ],
   "description": "Distribution packages for Bootswatch themes. Just the ones ready to use with Bower.",
   "main": [
-    "css/bootstrap.css",
-    "js/bootstrap.js",
-    "fonts/glyphicons-halflings-regular.eot",
-    "fonts/glyphicons-halflings-regular.svg",
-    "fonts/glyphicons-halflings-regular.ttf",
-    "fonts/glyphicons-halflings-regular.woff",
-    "fonts/glyphicons-halflings-regular.woff2"
+    "js/bootstrap.js"
   ],
   "dependencies": {
     "jquery": ">= 1.9.0"
@@ -49,14 +43,13 @@
     "Gruntfile.js",
     ".gitignore"
   ],
-  "_release": "19adba4383",
+  "_release": "76ace959fc",
   "_resolution": {
     "type": "branch",
     "branch": "flatly",
-    "commit": "19adba43833274121ebae93b301bafea253a3b20"
+    "commit": "76ace959fc0edd183b3c37380ba2aa75d83a1f97"
   },
   "_source": "git://github.com/dbtek/bootswatch-dist.git",
   "_target": "flatly",
-  "_originalSource": "bootswatch-dist",
-  "_direct": true
+  "_originalSource": "bootswatch-dist"
 }
